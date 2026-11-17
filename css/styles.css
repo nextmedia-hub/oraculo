@@ -75,7 +75,7 @@ html, body {
   height: 100vh;
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   justify-items: center;
   padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
   overflow: hidden;
@@ -542,7 +542,7 @@ html, body {
   position: relative;
   z-index: 3;
   max-width: 32ch;
-  margin: 0 auto clamp(18px, 5dvh, 48px);
+  margin: 0 auto;
   text-align: center;
   opacity: 0;
   transform: translateY(14px);
@@ -570,6 +570,77 @@ html, body {
   color: var(--c-ink);
 }
 .oracle.is-revealed .reading { opacity: 1; transform: none; filter: none; }
+
+/* ========================= BOTÓN "VOLVER A PROBAR SUERTE" ========================= */
+.oracle__footer {
+  grid-row: 4;
+  position: relative;
+  z-index: 3;
+  padding: clamp(14px, 2.5dvh, 24px) 0 clamp(6px, 2dvh, 20px);
+}
+.retry {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .9rem 1.7rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-turq);
+  color: var(--c-bg);
+  font: 600 .92rem/1 var(--font-body);
+  letter-spacing: .03em;
+  cursor: pointer;
+  box-shadow:
+    0 10px 28px -10px rgba(79, 199, 198, .7),
+    inset 0 1px 0 rgba(255, 255, 255, .45);
+  -webkit-tap-highlight-color: transparent;
+  /* oculto hasta la revelación (visibility lo saca también del foco) */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(16px);
+  transition:
+    opacity .6s ease,
+    transform .6s var(--ease-out),
+    box-shadow .3s ease,
+    background-color .3s ease,
+    visibility 0s linear .6s;
+}
+.retry svg {
+  width: 18px; height: 18px;
+  fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .5s var(--ease-out);
+}
+.retry:hover { background-color: #6ad6d5; box-shadow: 0 14px 34px -10px rgba(79, 199, 198, .9), inset 0 1px 0 rgba(255, 255, 255, .45); }
+.retry:hover svg { transform: rotate(-180deg); }
+.retry:active { transform: scale(.97); }
+.retry:focus-visible { outline: 2px solid var(--c-ink); outline-offset: 4px; }
+
+.oracle.is-revealed .retry {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity .8s ease .25s,
+    transform .8s var(--ease-out) .25s,
+    box-shadow .3s ease,
+    background-color .3s ease,
+    visibility 0s;
+}
+
+/* ---- Vuelta al mazo (al pulsar el botón) ----
+   1) .is-unflipping: la carta gira de nuevo boca abajo
+   2) .is-returning:  la carta baja y se reintegra en el mazo */
+.oracle.is-unflipping .card__inner {
+  animation: cardFlipBack calc(var(--t-flip) * .75) var(--ease-flip) forwards;
+}
+@keyframes cardFlipBack {
+  0%   { transform: translateZ(0px)  rotateY(180deg); }
+  50%  { transform: translateZ(50px) rotateY(90deg); }
+  100% { transform: translateZ(0px)  rotateY(0deg); }
+}
+.oracle.is-returning .card {
+  transition: transform var(--t-lift) cubic-bezier(.5, 0, .2, 1);
+}
 
 /* ========================= RESPONSIVE ========================= */
 @media (min-width: 768px) {

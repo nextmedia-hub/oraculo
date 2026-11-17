@@ -65,7 +65,7 @@
     { id: 2, title: 'El Impacto',  message: 'Un gran impacto en resultados se avecina. Este año, cada idea que lancemos dejará una marca imborrable.',          image: placeholderArt('impacto', 2) },
     { id: 3, title: 'El Faro',     message: 'Incluso en los briefings con más niebla, la claridad nos guiará. En 2027, iluminaremos juntos el camino hacia el éxito.',                image: placeholderArt('faro', 3) },
     { id: 4, title: 'El Salto',    message: 'Es el momento de atreverse. Las cartas predicen un año de ideas valientes e innovación que nos llevarán al siguiente nivel.',     image: placeholderArt('salto', 4) },
-    { id: 5, title: 'La Cosecha',  message: 'Todo el esfuerzo sembrado empieza a dar sus frutos. Prepárate para un año donde recogeremos grandes victorias juntos.',            image: placeholderArt('cosecha', 5) },
+    { id: 5, title: 'La Cosecha',  message: 'Prepárate para un 2027 donde recogeremos grandes victorias juntos.',            image: placeholderArt('cosecha', 5) },
     { id: 6, title: 'La Estrella', message: 'La alineación es perfecta. En 2027,  brillaremos tanto juntos que será imposible pasar desapercibidos.',            image: placeholderArt('estrella', 6) },
   ];
 
@@ -106,6 +106,7 @@
     text: $('readingText'),
     fx: $('fx'),
     header: document.querySelector('.oracle__header'),
+    retry: $('retry'),
   };
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -167,10 +168,15 @@
   /* -----------------------------------------------------------------------
      Contenido
      ----------------------------------------------------------------------- */
+  // Elige un arcano al azar, sin repetir el de la tirada anterior
+  let lastId = null;
   function pickArcano() {
+    const pool = ARCANA.filter((a) => a.id !== lastId);
     const buf = new Uint32Array(1);
     const rnd = window.crypto?.getRandomValues ? crypto.getRandomValues(buf)[0] / 2 ** 32 : Math.random();
-    return ARCANA[Math.floor(rnd * ARCANA.length)];
+    const arcano = pool[Math.floor(rnd * pool.length)];
+    lastId = arcano.id;
+    return arcano;
   }
 
   function renderCard(a) {
@@ -178,7 +184,7 @@
     els.title.textContent = a.title;
     els.image.src = a.image;
     els.image.alt = `Ilustración del arcano ${a.title}`;
-    els.kicker.textContent = `Arcano ${ROMAN[a.id - 1]} · ${a.title}`;
+    els.kicker.textContent = `${ROMAN[a.id - 1]} · ${a.title}`;
     els.text.textContent = a.message;
   }
 
@@ -338,12 +344,12 @@
       gyroscope: false,            // el giroscopio lo gestionamos nosotros
     });
     motion.mouseTilt = true;
-    els.tilt.addEventListener('tiltChange', (e) => {
-      motion.target.x = clamp((e.detail.percentageX - 50) / 50, -1, 1);
-      motion.target.y = clamp((e.detail.percentageY - 50) / 50, -1, 1);
-      markInput();
-    });
   }
+  els.tilt.addEventListener('tiltChange', (e) => {
+    motion.target.x = clamp((e.detail.percentageX - 50) / 50, -1, 1);
+    motion.target.y = clamp((e.detail.percentageY - 50) / 50, -1, 1);
+    markInput();
+  });
 
   /* ---- Giroscopio ---- */
   function onOrientation(e) {
@@ -428,14 +434,37 @@
     startLoop();
   }
 
+  // Detiene todo el movimiento y devuelve la carta a su posición neutra (suave)
+  function stopMotion() {
+    if (!motion.running) return;
+    motion.running = false;
+    stopLoop();
+    if (els.tilt.vanillaTilt) els.tilt.vanillaTilt.destroy();
+    motion.mouseTilt = false;
+    motion.dragId = null;
+    motion.idleW = 1;
+    motion.lastInput = -Infinity;
+    motion.target.x = motion.target.y = 0;
+    motion.current.x = motion.current.y = 0;
+
+    els.float.style.transition = 'transform .5s ease';
+    els.float.style.transform = '';
+    els.tilt.style.removeProperty('--x');
+    els.tilt.style.removeProperty('--y');
+    els.tilt.style.removeProperty('--foil');
+    setTimeout(() => { els.float.style.transition = ''; }, 500);
+  }
+
   /* -----------------------------------------------------------------------
      FLUJO PRINCIPAL
      ----------------------------------------------------------------------- */
   let drawn = false;
+  let busy = false;              // true mientras dura cualquier animación
 
   async function draw() {
-    if (drawn) return;           // bloquea nuevos clics
+    if (drawn || busy) return;   // bloquea nuevos clics
     drawn = true;
+    busy = true;
 
     els.deck.removeAttribute('tabindex');
     els.deck.setAttribute('aria-disabled', 'true');
@@ -461,7 +490,43 @@
     // 4) Revelación del texto
     await wait(TIMING.revealDelay);
     oracle.classList.add('is-revealed');
+    busy = false;
   }
+
+  /* -----------------------------------------------------------------------
+     VOLVER A PROBAR SUERTE: la carta gira boca abajo, vuelve al mazo y
+     la escena queda como al principio, lista para otra tirada.
+     ----------------------------------------------------------------------- */
+  async function resetDraw() {
+    if (!drawn || busy) return;
+    busy = true;
+    const { oracle } = els;
+    const hadFocus = document.activeElement === els.retry;
+
+    // 1) Se ocultan texto y botón
+    oracle.classList.remove('is-revealed');
+    stopMotion();
+    await wait(450 * k);
+
+    // 2) La carta gira boca abajo
+    oracle.classList.add('is-unflipping');
+    oracle.classList.remove('is-flipped');
+    await wait(TIMING.flip * 0.75);
+
+    // 3) Baja y se reintegra en el mazo
+    oracle.classList.add('is-returning');
+    oracle.classList.remove('is-placed', 'is-drawn');
+    await wait(TIMING.lift);
+
+    oracle.classList.remove('is-returning', 'is-unflipping');
+    els.deck.setAttribute('tabindex', '0');
+    els.deck.removeAttribute('aria-disabled');
+    if (hadFocus) els.deck.focus({ preventScroll: true });
+    drawn = false;
+    busy = false;
+  }
+
+  els.retry.addEventListener('click', resetDraw);
 
   /* -----------------------------------------------------------------------
      Entrada: tap, swipe hacia arriba o teclado
