@@ -389,6 +389,7 @@ html, body {
 .card__title {
   margin: 0;
   padding-top: 3%;
+  padding-bottom: 3%;
   border-top: 1px solid rgba(79, 199, 198, .35);
   text-align: center;
   font-family: var(--font-display);
@@ -415,11 +416,15 @@ html, body {
   z-index: 3;
   pointer-events: none;
   border-radius: inherit;
-  background:
+  /* ANTES (v1): el punto blanco iba en esta misma capa y salía grisáceo.
+     Para volver atrás: descomenta este radial-gradient, borra el bloque
+     .card__shine de abajo y quita el <span class="card__shine"> del HTML.
     radial-gradient(circle at var(--x) var(--y),
       rgba(255, 255, 255, .65) 0%,
       rgba(255, 255, 255, .22) 14%,
       rgba(255, 255, 255, 0) 42%),
+  */
+  background:
     linear-gradient(115deg,
       transparent 18%,
       rgba(79, 199, 198, .60) 32%,
@@ -427,10 +432,33 @@ html, body {
       rgba(255, 85, 0, .55) 52%,
       rgba(79, 199, 198, .50) 64%,
       transparent 80%);
+  /* ANTES (v1), con el radial blanco incluido:
   background-size: 100% 100%, 260% 260%;
   background-position: 0 0, calc(100% - var(--x)) calc(100% - var(--y));
+  */
+  background-size: 260% 260%;
+  background-position: calc(100% - var(--x)) calc(100% - var(--y));
   mix-blend-mode: color-dodge;
   opacity: var(--foil);
+}
+
+/* BRILLO BLANCO (v2): capa propia en modo "screen", que suma luz blanca pura
+   en lugar de teñirla. Ajustes rápidos:
+     · más/menos blanco  → alfa de la 1ª parada (.95)
+     · tamaño del brillo → % de la última parada (40%)
+     · intensidad mínima → el .3 de la opacidad */
+.card__shine {
+  position: absolute; inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--x) var(--y),
+    rgba(255, 255, 255, .95) 0%,
+    rgba(255, 255, 255, .55) 10%,
+    rgba(255, 255, 255, .18) 24%,
+    rgba(255, 255, 255, 0) 40%);
+  mix-blend-mode: screen;
+  opacity: calc(.3 + var(--foil) * .7);
 }
 
 /* Purpurina: micro-puntos que solo brillan cerca de la luz (máscara radial) */
@@ -444,7 +472,8 @@ html, body {
   background-size: 9px 11px, 13px 7px;
   background-position: 0 0, 4px 5px;
   mix-blend-mode: overlay;
-  opacity: calc(var(--foil) * 1.2);
+  /* ANTES (v1): opacity: calc(var(--foil) * 1.2); */
+  opacity: calc(var(--foil) * 1.6);
   -webkit-mask-image: radial-gradient(circle at var(--x) var(--y), #000 0%, transparent 45%);
           mask-image: radial-gradient(circle at var(--x) var(--y), #000 0%, transparent 45%);
 }

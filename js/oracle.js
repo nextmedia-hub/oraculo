@@ -293,7 +293,8 @@
     const y = iy * IDLE.reach * w + motion.current.y * (1 - w);
     let fx = 50 + x * 50;
     let fy = 50 + y * 50;
-    let intensity = 0.15 + clamp(Math.hypot(x, y), 0, 1) * 0.55;
+    // ANTES (v1): let intensity = 0.15 + clamp(Math.hypot(x, y), 0, 1) * 0.55;
+    let intensity = 0.22 + clamp(Math.hypot(x, y), 0, 1) * 0.6;
 
     // Destello periódico (solo en reposo): una franja de luz cruza la carta en diagonal
     if (IDLE.glintEvery > 0) {
@@ -303,7 +304,8 @@
         const pos = -10 + 120 * easeInOut(g);
         fx += (pos - fx) * amt;
         fy += (pos - fy) * amt;
-        intensity += 0.45 * amt;
+        // ANTES (v1): intensity += 0.45 * amt;
+        intensity += 0.6 * amt;
       }
     }
 
