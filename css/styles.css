@@ -1,0 +1,581 @@
+/* =========================================================================
+   EL ORÁCULO CREATIVO · 2027
+   Mobile-first · 100dvh sin scroll
+   ========================================================================= */
+
+/* ========================= TIPOGRAFÍA: POPPINS (Google Fonts, cargada en index.html) =========================
+   Pesos cargados: 300 · 400 · 400 italic · 500 · 600 · 700. Para añadir otro, edita la URL del <link>. */
+
+/* Propiedades registradas: permiten ANIMAR las variables del foil
+   (el barrido de luz al revelar la carta). */
+@property --x    { syntax: '<percentage>'; inherits: true; initial-value: 50%; }
+@property --y    { syntax: '<percentage>'; inherits: true; initial-value: 30%; }
+@property --foil { syntax: '<number>';     inherits: true; initial-value: 0.45; }
+
+:root {
+  /* ---- Paleta ---- */
+  --c-bg:        #0B1023;
+  --c-bg-lift:   #17204a;
+  --c-turq:      #4FC7C6;
+  --c-orange:    #FF5500;
+  --c-ink:       #EEF4F6;
+  --c-ink-dim:   rgba(238, 244, 246, .68);
+  --c-card:      #0E1533;
+
+  --font-display: 'Poppins', system-ui, -apple-system, sans-serif;
+  --font-body:    'Poppins', system-ui, -apple-system, sans-serif;
+
+  /* ---- Tamaño de carta (proporción tarot ≈ 1 : 1.62) ---- */
+  --card-w: min(48vw, 30vh, 280px);
+  --card-h: calc(var(--card-w) * 1.62);
+  --radius: calc(var(--card-w) * .05);
+
+  /* ---- Mazo ---- */
+  --deck-gap: 5px;                        /* separación vertical de los cantos */
+  --deck-bottom: max(5vh, 26px);          /* distancia del mazo al borde inferior */
+
+  /* ---- 3D: valores que JS sobrescribe al medir la pantalla ---- */
+  --perspective: 1100px;
+  --lift-y: -40vh;                        /* recorrido vertical de la carta */
+  --lift-scale: 1.25;                     /* escala final (acercamiento a cámara) */
+
+  /* ---- Tiempos (JS los reescribe desde su objeto TIMING) ---- */
+  --t-lift: 1100ms;
+  --t-flip: 1100ms;
+  --t-reveal: 900ms;
+
+  --ease-out:  cubic-bezier(.22, 1, .36, 1);
+  --ease-flip: cubic-bezier(.65, 0, .3, 1);
+}
+
+@supports (height: 1dvh) {
+  :root { --card-w: min(48vw, 30dvh, 280px); --deck-bottom: max(5dvh, 26px); }
+}
+
+/* ========================= BASE ========================= */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ========================= ESCENA / TAPETE ========================= */
+.oracle {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  isolation: isolate;
+  /* Iluminación de bodegón: foco cenital + rebote turquesa en el "suelo" */
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 30%, var(--c-bg-lift) 0%, transparent 70%),
+    radial-gradient(ellipse 90% 35% at 50% 100%, rgba(79, 199, 198, .10), transparent 70%),
+    var(--c-bg);
+}
+
+/* Textura de tapete (ruido fino) */
+.oracle::before {
+  content: '';
+  position: absolute; inset: 0; z-index: -1;
+  pointer-events: none;
+  opacity: .09;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Viñeta (aparece al revelar). El mazo se oscurece aparte (.deck__stack) para que
+   el velo no tape la carta revelada. */
+.oracle::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0, 0, 0, .55) 100%);
+  opacity: 0;
+  transition: opacity var(--t-reveal) ease;
+}
+.oracle.is-revealed::after { opacity: 1; }
+
+/* ========================= CABECERA ========================= */
+.oracle__header {
+  position: relative; z-index: 3;
+  text-align: center;
+}
+/* Logo next'media (assets/logo-nextmedia.png: recorte web del PNG de /Logo) */
+.brand { margin: 0 0 .7rem; }
+.brand img {
+  display: block;
+  height: clamp(20px, 5.6vw, 28px);
+  width: auto;
+  margin: 0 auto;
+}
+.oracle__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(1.2rem, 5vw, 1.75rem);
+  letter-spacing: .01em;
+}
+.oracle__title em { font-weight: 400; color: var(--c-turq); }
+
+/* =========================================================================
+   EL MAZO (3D)
+   - .deck tiene la perspectiva. Su perspective-origin se desplaza (vía JS)
+     al punto donde termina la carta para que el flip no se vea sesgado.
+   - .deck__card: cartas estáticas desplazadas en translateY/translateZ
+     → se ven los cantos apilados.
+   ========================================================================= */
+.deck {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--deck-bottom) + 4 * var(--deck-gap));
+  z-index: 1;
+  width: var(--card-w);
+  height: var(--card-h);
+  margin-left: calc(var(--card-w) / -2);
+  perspective: var(--perspective);
+  perspective-origin: 50% calc(50% + var(--lift-y));
+  cursor: pointer;
+  touch-action: none;           /* permite detectar el swipe sin scroll */
+  outline: none;
+  border-radius: var(--radius);
+}
+.deck:focus-visible { box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-turq); }
+.oracle.is-drawn .deck { cursor: default; }
+
+/* Sombra de contacto (ambient occlusion simulado): dos capas, una dura y una difusa */
+.deck__ao {
+  position: absolute;
+  left: -14%; right: -14%;
+  bottom: calc(-4 * var(--deck-gap) - 18px);
+  height: 44px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 46% 30% at 50% 45%, rgba(0, 0, 0, .85), transparent 70%),
+    radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0, 0, 0, .55), transparent 75%);
+  filter: blur(6px);
+  transition: opacity .9s ease, transform .9s var(--ease-out);
+}
+
+/* Reflejo turquesa en el suelo oscuro */
+.deck__reflection {
+  position: absolute;
+  left: 6%; right: 6%;
+  top: calc(100% + 4 * var(--deck-gap) + 4px);
+  height: 22%;
+  pointer-events: none;
+  border-radius: var(--radius);
+  background: linear-gradient(to bottom, rgba(79, 199, 198, .28), rgba(79, 199, 198, 0) 85%);
+  filter: blur(7px);
+  opacity: .55;
+  transform: scaleY(.7);
+  transform-origin: top;
+}
+
+.deck__stack {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 1s var(--ease-out) calc(var(--t-lift) * .4);
+}
+
+.deck__card,
+.card__back {
+  position: absolute; inset: 0;
+  border-radius: var(--radius);
+  color: var(--c-turq);                   /* color del dibujo del dorso (SVG usa currentColor) */
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 52%, rgba(79, 199, 198, .16), transparent 70%),
+    radial-gradient(circle at 30% 20%, #1a2a66 0%, transparent 55%),
+    linear-gradient(170deg, #142060, #0c1440 60%, #0a1030);
+  box-shadow:
+    inset 0 0 0 1px rgba(79, 199, 198, .45),
+    inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+.deck__card svg,
+.card__back svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* Volumen del mazo: cada carta baja unos px y se aleja en Z */
+.deck__card {
+  transform:
+    translateY(calc(var(--i) * var(--deck-gap)))
+    translateZ(calc(var(--i) * -2px));
+  box-shadow:
+    inset 0 0 0 1px rgba(79, 199, 198, .45),
+    0 1px 0 rgba(79, 199, 198, .35),       /* canto iluminado */
+    0 2px 4px rgba(0, 0, 0, .45);
+}
+.deck__card[style*="--i:4"] { box-shadow: inset 0 0 0 1px rgba(79,199,198,.4), 0 18px 40px -12px rgba(0,0,0,.8); }
+
+/* Tras robar: el mazo baja un poco y se oscurece (queda como en la referencia, detrás del texto) */
+.oracle.is-drawn .deck__stack    { transform: translateY(10%); }
+
+/* Velo sobre el mazo (capa 2D entre el mazo y la carta). Se usa en vez de
+   filter: brightness() porque los filtros no se aplican bien sobre preserve-3d. */
+.deck__shade {
+  position: absolute;
+  inset: -3px -3px calc(-4 * var(--deck-gap) - 4px) -3px;
+  z-index: 1;
+  border-radius: var(--radius);
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(11, 16, 35, .55), rgba(11, 16, 35, .82) 35%, rgba(11, 16, 35, .9));
+  opacity: 0;
+  transition: opacity 1s ease, transform 1s var(--ease-out) calc(var(--t-lift) * .4);
+}
+.oracle.is-drawn .deck__shade    { opacity: .35; transform: translateY(10%); }
+.oracle.is-revealed .deck__shade { opacity: 1; }
+.oracle.is-revealed .deck__reflection { opacity: .2; }
+.reading { text-shadow: 0 2px 12px rgba(11, 16, 35, .9); }
+.oracle.is-drawn .deck__ao    { transform: translateY(10%); }
+
+/* =========================================================================
+   LA CARTA QUE SE ROBA
+   Jerarquía (cada nivel tiene UNA responsabilidad de transform):
+     .card        → separación del mazo (lift)
+     .card__tilt  → vanilla-tilt (rotación por ratón/giroscopio)
+     .card__inner → flip 180º
+     .card__face  → caras con backface-visibility: hidden
+   ========================================================================= */
+.card {
+  position: absolute; inset: 0;
+  z-index: 2;
+  transform-style: preserve-3d;
+  transform: translateY(0) translateZ(1px) rotateX(0deg) scale(1);
+  transition: transform .45s var(--ease-out);
+}
+
+/* Hover (desktop): la carta superior "asoma" invitando a robarla */
+@media (hover: hover) {
+  .oracle:not(.is-drawn) .deck:hover .card {
+    transform: translateY(-5%) translateZ(1px) rotateX(0deg) scale(1);
+  }
+}
+
+/* 1) LIFT — la carta sube hacia el centro y se acerca a cámara.
+   Se omite el keyframe 0% para que arranque desde la posición actual (p.ej. hover).
+   Ajusta translateZ / rotateX del 45% para un arco más o menos dramático. */
+.oracle.is-drawn .card {
+  animation: cardLift var(--t-lift) cubic-bezier(.3, .7, .2, 1) forwards;
+}
+@keyframes cardLift {
+  45% {
+    transform: translateY(calc(var(--lift-y) * .62)) translateZ(110px) rotateX(16deg) scale(calc(var(--lift-scale) * .98));
+  }
+  100% {
+    transform: translateY(var(--lift-y)) translateZ(0px) rotateX(0deg) scale(var(--lift-scale));
+  }
+}
+/* Al terminar, JS añade .is-placed: posición estática (recalculable en resize) */
+.oracle.is-placed .card {
+  animation: none;
+  transition: none;
+  transform: translateY(var(--lift-y)) translateZ(0px) rotateX(0deg) scale(var(--lift-scale));
+}
+
+.card__tilt {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  border-radius: var(--radius);
+  /* Variables del foil: JS las escribe aquí desde el evento tiltChange */
+  --x: 50%;
+  --y: 30%;
+  --foil: .16;
+}
+
+/* 2) FLIP — rotateY 180º con un pequeño "salto" en Z a mitad de giro */
+.card__inner {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  transform: translateZ(0px) rotateY(0deg);
+}
+.oracle.is-flipped .card__inner {
+  animation: cardFlip var(--t-flip) var(--ease-flip) forwards;
+}
+@keyframes cardFlip {
+  0%   { transform: translateZ(0px)  rotateY(0deg); }
+  50%  { transform: translateZ(70px) rotateY(90deg); }
+  100% { transform: translateZ(0px)  rotateY(180deg); }
+}
+
+.card__face {
+  position: absolute; inset: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+}
+
+.card__back {
+  box-shadow:
+    inset 0 0 0 1px rgba(79, 199, 198, .5),
+    inset 0 1px 0 rgba(255, 255, 255, .14),
+    0 14px 30px -10px rgba(0, 0, 0, .75);
+}
+/* Brillo especular del dorso (barniz) */
+.card__back::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(125deg, transparent 35%, rgba(255, 255, 255, .10) 48%, transparent 60%);
+}
+
+/* ---- Cara frontal ---- */
+.card__front {
+  transform: rotateY(180deg);
+  isolation: isolate;                      /* el blend del foil queda dentro de la carta */
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 4%;
+  padding: 9% 9% 7%;
+  color: var(--c-ink);
+  background:
+    radial-gradient(ellipse 90% 50% at 50% 0%, #1f2d66, transparent 70%),
+    linear-gradient(175deg, #131c45, var(--c-card) 55%, #090e22);
+  box-shadow:
+    inset 0 0 0 1px rgba(79, 199, 198, .55),
+    0 30px 60px -18px rgba(0, 0, 0, .85),
+    0 0 0 .5px rgba(255, 255, 255, .08);
+}
+/* Marco interior */
+.card__front::before {
+  content: '';
+  position: absolute; inset: 4%;
+  border: 1px solid rgba(79, 199, 198, .55);
+  border-radius: calc(var(--radius) * .6);
+  box-shadow: inset 0 0 0 3px rgba(11, 16, 35, .6), inset 0 0 0 4px rgba(79, 199, 198, .2);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.card__numeral {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: calc(var(--card-w) * .07);
+  letter-spacing: .14em;
+  color: var(--c-turq);
+}
+.card__art {
+  margin: 0;
+  min-height: 0;
+  border-radius: calc(var(--radius) * .5);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(79, 199, 198, .35);
+  background: #0d1430;
+}
+.card__art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.card__title {
+  margin: 0;
+  padding-top: 3%;
+  border-top: 1px solid rgba(79, 199, 198, .35);
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: calc(var(--card-w) * .072);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+/* =========================================================================
+   EFECTO FOIL / HOLOGRÁFICO
+   --x, --y   → posición de la luz (0–100%), vienen de vanilla-tilt
+   --foil     → intensidad (0–1), crece con el ángulo de inclinación
+   Capas del ::after (de arriba a abajo):
+     1. Punto especular blanco que sigue la luz
+     2. Bandas holográficas turquesa/naranja que se desplazan en sentido contrario
+   Ajustes rápidos: cambia los rgba de las paradas, el ángulo (115deg)
+   o el mix-blend-mode (color-dodge = más metálico, overlay = más sutil).
+   ========================================================================= */
+.card__front::after {
+  content: '';
+  position: absolute; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at var(--x) var(--y),
+      rgba(255, 255, 255, .65) 0%,
+      rgba(255, 255, 255, .22) 14%,
+      rgba(255, 255, 255, 0) 42%),
+    linear-gradient(115deg,
+      transparent 18%,
+      rgba(79, 199, 198, .60) 32%,
+      rgba(255, 255, 255, .40) 42%,
+      rgba(255, 85, 0, .55) 52%,
+      rgba(79, 199, 198, .50) 64%,
+      transparent 80%);
+  background-size: 100% 100%, 260% 260%;
+  background-position: 0 0, calc(100% - var(--x)) calc(100% - var(--y));
+  mix-blend-mode: color-dodge;
+  opacity: var(--foil);
+}
+
+/* Purpurina: micro-puntos que solo brillan cerca de la luz (máscara radial) */
+.card__glitter {
+  position: absolute; inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, .9) .6px, transparent 1.3px),
+    radial-gradient(rgba(79, 199, 198, .9) .6px, transparent 1.3px);
+  background-size: 9px 11px, 13px 7px;
+  background-position: 0 0, 4px 5px;
+  mix-blend-mode: overlay;
+  opacity: calc(var(--foil) * 1.2);
+  -webkit-mask-image: radial-gradient(circle at var(--x) var(--y), #000 0%, transparent 45%);
+          mask-image: radial-gradient(circle at var(--x) var(--y), #000 0%, transparent 45%);
+}
+
+/* Barrido de luz justo al terminar el giro (anima las @property --x/--y/--foil) */
+.oracle.is-flipped .card__front {
+  animation: foilSweep 1.6s ease-in-out calc(var(--t-flip) * .55) backwards;
+  /* "backwards" (no "forwards"): al acabar, --x/--y vuelven a heredarse de vanilla-tilt */
+}
+@keyframes foilSweep {
+  0%   { --x: -10%; --y: 0%;   --foil: .2; }
+  50%  { --foil: 1; }
+  100% { --x: 110%; --y: 100%; --foil: .16; }
+}
+
+/* ========================= DESTELLOS (FX) ========================= */
+.fx {
+  position: absolute;
+  left: 50%;
+  top: var(--fx-y, 40%);
+  z-index: 0;
+  width: 0; height: 0;
+  pointer-events: none;
+}
+.fx__aura {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: calc(var(--card-w) * 2.6);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) scale(.6);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 85, 0, .28) 0%, rgba(255, 85, 0, 0) 45%),
+    radial-gradient(circle, rgba(79, 199, 198, .22) 20%, rgba(79, 199, 198, 0) 65%);
+  filter: blur(8px);
+  opacity: 0;
+  transition: opacity 1.2s ease, transform 1.6s var(--ease-out);
+}
+.oracle.is-flipped .fx__aura {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  animation: auraBreath 5s ease-in-out 1.6s infinite;
+}
+@keyframes auraBreath { 50% { transform: translate(-50%, -50%) scale(1.07); } }
+
+.spark {
+  position: absolute;
+  left: 0; top: 0;
+  width: var(--s, 4px); height: var(--s, 4px);
+  border-radius: 50%;
+  background: var(--c-orange);
+  box-shadow: 0 0 6px 2px rgba(255, 85, 0, .8), 0 0 14px 4px rgba(255, 140, 60, .35);
+  animation: spark var(--d, 900ms) cubic-bezier(.1, .7, .3, 1) forwards;
+}
+.spark--turq { background: #bff3f2; box-shadow: 0 0 6px 2px rgba(79, 199, 198, .9); }
+@keyframes spark {
+  0%   { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0); opacity: 0; }
+}
+
+/* ========================= TEXTO GUÍA ========================= */
+.hint {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(var(--deck-bottom) + 4 * var(--deck-gap) + var(--card-h) + 18px);
+  z-index: 3;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .3rem;
+  font-size: clamp(.8rem, 3.4vw, .95rem);
+  font-weight: 500;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--c-ink);
+  pointer-events: none;
+  animation: pulse 2.4s ease-in-out infinite;
+  transition: opacity .4s ease, transform .4s ease;
+}
+.hint__chevron {
+  width: 22px; height: 22px;
+  fill: none; stroke: var(--c-turq); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  animation: nudge 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@keyframes nudge { 50% { transform: translateY(-5px); } }
+
+.oracle.is-drawn .hint { animation: none; opacity: 0; transform: translateY(-10px); }
+
+/* ========================= REVELACIÓN ========================= */
+.reading {
+  grid-row: 3;
+  position: relative;
+  z-index: 3;
+  max-width: 32ch;
+  margin: 0 auto clamp(18px, 5dvh, 48px);
+  text-align: center;
+  opacity: 0;
+  transform: translateY(14px);
+  filter: blur(6px);
+  transition:
+    opacity var(--t-reveal) ease,
+    transform var(--t-reveal) var(--ease-out),
+    filter var(--t-reveal) ease;
+}
+.reading__kicker {
+  margin: 0 0 .5rem;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .32em;
+  text-transform: uppercase;
+  color: var(--c-turq);
+}
+.reading__text {
+  margin: 0;
+  min-height: 3lh;             /* reserva espacio: el layout no salta */
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(1rem, 4.3vw, 1.25rem);
+  line-height: 1.45;
+  color: var(--c-ink);
+}
+.oracle.is-revealed .reading { opacity: 1; transform: none; filter: none; }
+
+/* ========================= RESPONSIVE ========================= */
+@media (min-width: 768px) {
+  :root { --card-w: min(30vh, 260px); }
+  @supports (height: 1dvh) { :root { --card-w: min(30dvh, 260px); } }
+}
+
+/* Móvil en horizontal / pantallas muy bajas */
+@media (max-height: 520px) and (orientation: landscape) {
+  :root { --card-w: min(26vw, 38vh); --deck-bottom: 12px; }
+  .oracle__title { display: none; }
+  .reading__text { min-height: 2lh; font-size: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint, .hint__chevron, .oracle.is-flipped .fx__aura { animation: none; }
+  .hint { opacity: .85; }
+}
