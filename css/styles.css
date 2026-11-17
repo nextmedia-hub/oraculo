@@ -294,6 +294,15 @@ html, body {
   --foil: .16;
 }
 
+/* Capa de movimiento propio: animación en reposo + giroscopio + arrastre con el dedo.
+   La controla js/oracle.js (bloque MOVIMIENTO DE LA CARTA). Va separada de
+   .card__tilt para no pelearse con vanilla-tilt. */
+.card__float {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
 /* 2) FLIP — rotateY 180º con un pequeño "salto" en Z a mitad de giro */
 .card__inner {
   position: absolute; inset: 0;

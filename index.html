@@ -51,9 +51,11 @@
       </span>
       <span class="deck__shade" aria-hidden="true"></span>
 
-      <!-- Carta que se roba:  .card (lift) > .card__tilt (vanilla-tilt) > .card__inner (flip) -->
+      <!-- Carta que se roba:
+           .card (lift) > .card__tilt (vanilla-tilt, ratón) > .card__float (reposo / giroscopio / dedo) > .card__inner (flip) -->
       <div class="card" id="card">
         <div class="card__tilt" id="cardTilt">
+         <div class="card__float" id="cardFloat">
           <div class="card__inner" id="cardInner">
 
             <div class="card__face card__back" aria-hidden="true">
@@ -70,6 +72,7 @@
             </article>
 
           </div>
+         </div>
         </div>
       </div>
     </div>

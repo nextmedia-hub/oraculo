@@ -97,6 +97,7 @@
     deck: $('deck'),
     card: $('card'),
     tilt: $('cardTilt'),
+    float: $('cardFloat'),
     numeral: $('cardNumeral'),
     image: $('cardImage'),
     title: $('cardTitle'),
@@ -202,50 +203,229 @@
     }
   }
 
-  /* -----------------------------------------------------------------------
-     FOIL: vanilla-tilt → variables CSS --x, --y, --foil
-     vanilla-tilt emite 'tiltChange' con percentageX/Y (0–100) tanto con
-     ratón como con giroscopio.
-     ----------------------------------------------------------------------- */
-  function setFoil(px, py) {
-    const x = clamp(px, 0, 100);
-    const y = clamp(py, 0, 100);
-    // Intensidad del foil: base 0.15 en reposo → 1 con la carta muy inclinada
-    const intensity = 0.15 + clamp(Math.hypot(x - 50, y - 50) / 60, 0, 1) * 0.85;
-    els.tilt.style.setProperty('--x', `${x.toFixed(1)}%`);
-    els.tilt.style.setProperty('--y', `${y.toFixed(1)}%`);
-    els.tilt.style.setProperty('--foil', intensity.toFixed(2));
-  }
+  /* =======================================================================
+     MOVIMIENTO DE LA CARTA (inclinación + foil)
+     Fuentes de movimiento:
+       · Ratón      → vanilla-tilt (solo desktop) rota .card__tilt
+       · Giroscopio → rota .card__float (móvil, con permiso en iOS)
+       · Dedo       → arrastrar sobre la carta rota .card__float (plan B)
+       · Reposo     → animación suave automática cuando no hay entrada real
+     Un único bucle (requestAnimationFrame) mezcla el reposo con la entrada
+     real y escribe --x, --y, --foil para el brillo.
+     ======================================================================= */
 
-  function initFoilTilt() {
-    if (window.VanillaTilt) {
-      VanillaTilt.init(els.tilt, {
-        max: 14,                    // grados máximos de inclinación
-        speed: 900,
-        perspective: 1000,
-        scale: 1.02,
-        glare: false,               // usamos nuestro propio foil
-        reset: true,
-        'full-page-listening': true, // en desktop, toda la pantalla mueve la carta
-        gyroscope: true,
-        gyroscopeMinAngleX: -25, gyroscopeMaxAngleX: 25,
-        gyroscopeMinAngleY: -25, gyroscopeMaxAngleY: 25,
-      });
-      els.tilt.addEventListener('tiltChange', (e) => setFoil(e.detail.percentageX, e.detail.percentageY));
-    } else {
-      // Fallback si el CDN falla: solo foil, sin rotación
-      window.addEventListener('pointermove', (e) => {
-        setFoil((e.clientX / window.innerWidth) * 100, (e.clientY / window.innerHeight) * 100);
-      });
+  // Ajustes de la animación EN REPOSO
+  const IDLE = {
+    angle: 4,             // grados máximos de inclinación en reposo
+    reach: 0.8,           // 0–1: cuánto recorre la luz la carta en reposo
+    period: 8000,         // ms por ciclo completo (trayectoria en forma de 8)
+    resumeAfter: 2000,    // ms sin entrada real antes de volver al reposo
+    fadeIn: 1200,         // ms que tarda el reposo en recuperar el control
+    fadeOut: 400,         // ms que tarda en cederlo cuando el usuario interactúa
+    glintEvery: 7000,     // ms entre destellos que cruzan la carta (0 = sin destellos)
+    glintDuration: 1400,  // ms que dura cada destello
+  };
+
+  // Ajustes de la entrada real en MÓVIL (giroscopio y dedo)
+  const MOTION = {
+    gyroRange: 12,        // grados que hay que inclinar el móvil para llegar al máximo
+    maxAngle: 12,         // grados máximos que gira la carta
+    smoothing: 0.14,      // 0–1: suavizado por frame (más bajo = más suave)
+    recenter: 0.004,      // velocidad a la que se recalibra la posición "neutra" del móvil
+    jitter: 0.35,         // grados: por debajo se considera temblor del sensor, no movimiento
+  };
+
+  const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  const motion = {
+    running: false,
+    raf: 0,
+    last: 0,
+    idleW: 1,                    // 1 = reposo total · 0 = control total del usuario
+    lastInput: -Infinity,
+    target: { x: 0, y: 0 },      // entrada real normalizada (-1…1)
+    current: { x: 0, y: 0 },     // entrada suavizada
+    mouseTilt: false,            // vanilla-tilt activo (desktop)
+    dragId: null,
+    gyroOn: false,
+    gyro: { base: null, prev: null },
+  };
+
+  const markInput = () => { motion.lastInput = performance.now(); };
+  const smoothstep = (t) => t * t * (3 - 2 * t);
+  const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
+  function frame(now) {
+    const dt = Math.min(64, now - (motion.last || now));
+    motion.last = now;
+
+    // 1) Peso del reposo: baja rápido con entrada real, vuelve despacio sin ella
+    const active = now - motion.lastInput < IDLE.resumeAfter;
+    const step = dt / (active ? IDLE.fadeOut : IDLE.fadeIn);
+    motion.idleW = clamp(motion.idleW + (active ? -step : step), 0, 1);
+    const w = smoothstep(motion.idleW);
+
+    // 2) Entrada real suavizada
+    const k = 1 - Math.pow(1 - MOTION.smoothing, dt / 16.7);
+    motion.current.x += (motion.target.x - motion.current.x) * k;
+    motion.current.y += (motion.target.y - motion.current.y) * k;
+
+    // 3) Trayectoria de reposo: curva de Lissajous (un "8" tumbado)
+    const ph = (now / IDLE.period) * Math.PI * 2;
+    const ix = Math.sin(ph);
+    const iy = Math.sin(ph * 2) * 0.55;
+
+    // 4) Rotación de .card__float
+    const idleDeg = reduceMotion ? 0 : IDLE.angle;
+    const userRot = motion.mouseTilt ? 0 : MOTION.maxAngle * (1 - w); // en desktop rota vanilla-tilt
+    const rx = iy * idleDeg * w + motion.current.y * userRot;
+    const ry = ix * idleDeg * w + motion.current.x * userRot;
+    els.float.style.transform = `rotateX(${rx.toFixed(2)}deg) rotateY(${(-ry).toFixed(2)}deg)`;
+
+    // 5) Foil: posición de la luz e intensidad
+    const x = ix * IDLE.reach * w + motion.current.x * (1 - w);
+    const y = iy * IDLE.reach * w + motion.current.y * (1 - w);
+    let fx = 50 + x * 50;
+    let fy = 50 + y * 50;
+    let intensity = 0.15 + clamp(Math.hypot(x, y), 0, 1) * 0.55;
+
+    // Destello periódico (solo en reposo): una franja de luz cruza la carta en diagonal
+    if (IDLE.glintEvery > 0) {
+      const g = (now % IDLE.glintEvery) / IDLE.glintDuration;
+      if (g < 1) {
+        const amt = Math.sin(Math.PI * g) * w;
+        const pos = -10 + 120 * easeInOut(g);
+        fx += (pos - fx) * amt;
+        fy += (pos - fy) * amt;
+        intensity += 0.45 * amt;
+      }
     }
+
+    els.tilt.style.setProperty('--x', `${clamp(fx, -10, 110).toFixed(1)}%`);
+    els.tilt.style.setProperty('--y', `${clamp(fy, -10, 110).toFixed(1)}%`);
+    els.tilt.style.setProperty('--foil', clamp(intensity, 0, 1).toFixed(2));
+
+    motion.raf = requestAnimationFrame(frame);
   }
 
-  // iOS 13+: el giroscopio requiere permiso explícito dentro de un gesto del usuario
-  function requestGyroPermission() {
+  function startLoop() {
+    if (motion.raf) return;
+    motion.last = 0;
+    motion.raf = requestAnimationFrame(frame);
+  }
+  function stopLoop() {
+    cancelAnimationFrame(motion.raf);
+    motion.raf = 0;
+  }
+
+  // Pausa el bucle con la pestaña oculta (no gasta batería en segundo plano)
+  document.addEventListener('visibilitychange', () => {
+    if (!motion.running) return;
+    if (document.hidden) stopLoop(); else startLoop();
+  });
+
+  /* ---- Ratón (desktop): vanilla-tilt ---- */
+  function initMouseTilt() {
+    if (!finePointer || !window.VanillaTilt) return;
+    VanillaTilt.init(els.tilt, {
+      max: 14,                     // grados máximos de inclinación con el ratón
+      speed: 900,
+      perspective: 1000,
+      scale: 1.02,
+      glare: false,                // usamos nuestro propio foil
+      reset: true,
+      'full-page-listening': true, // toda la pantalla mueve la carta
+      gyroscope: false,            // el giroscopio lo gestionamos nosotros
+    });
+    motion.mouseTilt = true;
+    els.tilt.addEventListener('tiltChange', (e) => {
+      motion.target.x = clamp((e.detail.percentageX - 50) / 50, -1, 1);
+      motion.target.y = clamp((e.detail.percentageY - 50) / 50, -1, 1);
+      markInput();
+    });
+  }
+
+  /* ---- Giroscopio ---- */
+  function onOrientation(e) {
+    if (e.beta == null || e.gamma == null) return;
+    let b = e.beta;   // inclinación adelante/atrás
+    let g = e.gamma;  // inclinación izquierda/derecha
+
+    // En horizontal se intercambian los ejes
+    const angle = (screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0;
+    if (angle === 90) [b, g] = [-g, b];
+    else if (angle === -90 || angle === 270) [b, g] = [g, -b];
+
+    const G = motion.gyro;
+    if (!G.base) { G.base = { b, g }; G.prev = { b, g }; return; }
+
+    // La posición "neutra" se recalibra poco a poco: da igual cómo sujete el móvil el usuario
+    G.base.b += (b - G.base.b) * MOTION.recenter;
+    G.base.g += (g - G.base.g) * MOTION.recenter;
+
+    const moved = Math.abs(b - G.prev.b) + Math.abs(g - G.prev.g);
+    G.prev = { b, g };
+    if (motion.dragId !== null) return;            // el dedo tiene prioridad
+    if (moved > MOTION.jitter) markInput();         // ignora el temblor del sensor
+
+    motion.target.x = clamp((g - G.base.g) / MOTION.gyroRange, -1, 1);
+    motion.target.y = clamp((b - G.base.b) / MOTION.gyroRange, -1, 1);
+  }
+
+  function enableGyro() {
+    if (motion.gyroOn) return;
+    motion.gyroOn = true;
+    window.addEventListener('deviceorientation', onOrientation);
+  }
+
+  // iOS 13+: el permiso SOLO se puede pedir dentro de un touchend/click.
+  // Si el usuario lo deniega, queda el arrastre con el dedo y la animación en reposo.
+  let motionPermission = 'unknown';
+  function ensureMotionPermission() {
     const DOE = window.DeviceOrientationEvent;
-    if (DOE && typeof DOE.requestPermission === 'function') {
-      DOE.requestPermission().catch(() => {});
-    }
+    if (!DOE) return;
+    if (typeof DOE.requestPermission !== 'function') { enableGyro(); return; } // Android: no hace falta permiso
+    if (motionPermission !== 'unknown') return;
+    motionPermission = 'pending';
+    DOE.requestPermission()
+      .then((state) => {
+        motionPermission = state;                  // 'granted' | 'denied'
+        if (state === 'granted') enableGyro();
+      })
+      .catch(() => { motionPermission = 'unknown'; }); // no era un gesto válido: se reintenta en el siguiente toque
+  }
+
+  /* ---- Dedo: arrastrar sobre la carta para inclinarla ---- */
+  function onDrag(e) {
+    const r = els.card.getBoundingClientRect();
+    motion.target.x = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2), -1, 1);
+    motion.target.y = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2), -1, 1);
+    markInput();
+  }
+  els.card.addEventListener('pointerdown', (e) => {
+    if (!motion.running || e.pointerType === 'mouse') return;
+    motion.dragId = e.pointerId;
+    els.card.setPointerCapture?.(e.pointerId);
+    onDrag(e);
+  });
+  els.card.addEventListener('pointermove', (e) => {
+    if (e.pointerId === motion.dragId) onDrag(e);
+  });
+  const endDrag = (e) => {
+    if (e.pointerId !== motion.dragId) return;
+    motion.dragId = null;
+    motion.target.x = 0;
+    motion.target.y = 0;
+    markInput();
+  };
+  els.card.addEventListener('pointerup', endDrag);
+  els.card.addEventListener('pointercancel', endDrag);
+
+  function startMotion() {
+    if (motion.running) return;
+    motion.running = true;
+    initMouseTilt();
+    startLoop();
   }
 
   /* -----------------------------------------------------------------------
@@ -256,8 +436,6 @@
   async function draw() {
     if (drawn) return;           // bloquea nuevos clics
     drawn = true;
-
-    requestGyroPermission();     // ¡tiene que ir antes de cualquier await!
 
     els.deck.removeAttribute('tabindex');
     els.deck.setAttribute('aria-disabled', 'true');
@@ -277,10 +455,10 @@
     wait(TIMING.flip * 0.45).then(burstSparks);
     await wait(TIMING.flip);
 
-    // 3) Foil interactivo
-    initFoilTilt();
+    // 3) Movimiento: reposo + ratón/giroscopio/dedo
+    startMotion();
 
-    // 4) Revelación del texto + CTA
+    // 4) Revelación del texto
     await wait(TIMING.revealDelay);
     oracle.classList.add('is-revealed');
   }
@@ -297,6 +475,9 @@
     if (dy < -20 || Math.abs(dy) < 12) draw();   // swipe arriba o toque
   });
   els.deck.addEventListener('pointercancel', () => { startY = null; });
+  // Permiso del giroscopio (iOS): se pide en touchend/click, que Safari sí acepta como gesto
+  els.deck.addEventListener('touchend', ensureMotionPermission);
+  els.deck.addEventListener('click', ensureMotionPermission);
   els.deck.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); draw(); }
   });
