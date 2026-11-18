@@ -671,6 +671,115 @@ html, body {
   transition: transform var(--t-lift) cubic-bezier(.5, 0, .2, 1);
 }
 
+/* ========================= SELECTOR DE IDIOMA (fijo arriba a la derecha) ========================= */
+.lang {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  z-index: 60;                       /* por encima del popup: siempre se puede cambiar */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(11, 16, 35, .72);
+  box-shadow: inset 0 0 0 1px rgba(79, 199, 198, .45);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.lang__thumb {                       /* pastilla turquesa que se desliza */
+  position: absolute;
+  top: 3px; bottom: 3px; left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: var(--c-turq);
+  transition: transform .35s var(--ease-out);
+}
+.lang[data-active="en"] .lang__thumb { transform: translateX(100%); }
+.lang__opt {
+  position: relative;
+  min-width: 40px;
+  padding: .42rem .7rem;
+  border: 0;
+  background: none;
+  color: var(--c-ink-dim);
+  font: 600 .72rem/1 var(--font-body);
+  letter-spacing: .12em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .3s ease;
+}
+.lang__opt[aria-pressed="true"] { color: var(--c-bg); }
+.lang__opt:focus-visible { outline: 2px solid var(--c-ink); outline-offset: 2px; border-radius: 999px; }
+
+/* ========================= POPUP DE BIENVENIDA ========================= */
+.welcome {
+  position: fixed; inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 72px 16px max(24px, env(safe-area-inset-bottom));
+  background: rgba(5, 8, 20, .72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+.welcome[hidden] { display: none; }
+.welcome.is-open { opacity: 1; }
+
+.welcome__panel {
+  position: relative;
+  width: min(100%, 360px);
+  padding: 2.2rem 1.6rem 1.7rem;
+  border-radius: 22px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(79, 199, 198, .16), transparent 70%),
+    linear-gradient(170deg, #17204a, #0c1440 65%, #0a1030);
+  box-shadow:
+    inset 0 0 0 1px rgba(79, 199, 198, .4),
+    0 30px 80px -20px rgba(0, 0, 0, .8);
+  transform: translateY(24px) scale(.96);
+  transition: transform .6s var(--ease-out);
+}
+.welcome.is-open .welcome__panel { transform: none; }
+
+/* Mini dorso de carta (reutiliza el dibujo del mazo) */
+.welcome__card {
+  position: relative;
+  display: block;
+  width: 58px; height: 94px;
+  margin: 0 auto 1.2rem;
+  border-radius: 5px;
+  color: var(--c-turq);
+  background: linear-gradient(170deg, #142060, #0c1440 60%, #0a1030);
+  box-shadow: inset 0 0 0 1px rgba(79, 199, 198, .5), 0 10px 30px -6px rgba(79, 199, 198, .45);
+  transform: rotate(-6deg);
+}
+.welcome__card svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.welcome__title {
+  margin: 0 0 .8rem;
+  font-weight: 300;
+  font-size: clamp(1.3rem, 6vw, 1.6rem);
+  line-height: 1.2;
+}
+.welcome__title em { font-style: normal; font-weight: 500; color: var(--c-turq); }
+.welcome__text {
+  margin: 0 0 1.6rem;
+  font-weight: 300;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--c-ink);
+}
+/* El CTA reutiliza el estilo de .retry, pero siempre visible */
+.welcome__cta {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: box-shadow .3s ease, background-color .3s ease, transform .15s ease;
+}
+
 /* ========================= RESPONSIVE ========================= */
 @media (min-width: 768px) {
   :root { --card-w: min(30vh, 260px); }
@@ -685,6 +794,7 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .welcome, .welcome__panel, .lang__thumb { transition-duration: .01s; }
   .hint, .hint__chevron, .oracle.is-flipped .fx__aura { animation: none; }
   .hint { opacity: .85; }
 }

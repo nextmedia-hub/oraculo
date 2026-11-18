@@ -4,6 +4,68 @@
 (() => {
   'use strict';
 
+  /* =======================================================================
+     ⚙️  CONFIGURACIÓN EDITABLE
+     ======================================================================= */
+  const CONFIG = {
+    showWelcome: true,       // true = se muestra el popup de bienvenida al entrar · false = no se muestra
+    welcomeCtaDraws: false,  // true = "Probar mi suerte" cierra el popup Y saca una carta directamente
+    defaultLang: 'es',       // idioma inicial: 'es' o 'en' (si el usuario ya eligió uno, se recuerda)
+  };
+
+  /* =======================================================================
+     🌐  TEXTOS E IDIOMAS — edita aquí cualquier mensaje de la web.
+     · `title` admite <em>…</em> para la palabra en turquesa.
+     · `artAlt` usa {title} como hueco para el nombre del arcano.
+     · `arcana` va por número de carta (1–6), igual que ARCANA más abajo.
+     ======================================================================= */
+  const TEXTS = {
+    es: {
+      pageTitle: 'El Oráculo Creativo · 2027',
+      title: 'El Oráculo <em>Creativo</em>',
+      hint: 'Toca para sacar tu carta del 2027',
+      deckLabel: 'Mazo de cartas. Toca o desliza hacia arriba para sacar tu carta del 2027',
+      retry: 'Volver a probar suerte',
+      artAlt: 'Ilustración del arcano {title}',
+      langLabel: 'Idioma',
+      welcome: {
+        title: 'Bienvenido al <em>Oráculo Creativo</em>',
+        text: 'Las cartas del tarot te dirán qué nos depara el futuro.',
+        cta: 'Probar mi suerte',
+      },
+      arcana: {
+        1: { title: 'La Alianza',  message: 'Los astros son claros: los mejores proyectos nacen cuando unimos fuerzas. El 2027 nos encontrará construyendo juntos.' },
+        2: { title: 'El Impacto',  message: 'Un gran impacto en resultados se avecina. Este año, cada idea que lancemos dejará una marca imborrable.' },
+        3: { title: 'El Faro',     message: 'Incluso en los briefings con más niebla, la claridad nos guiará. En 2027, iluminaremos juntos el camino hacia el éxito.' },
+        4: { title: 'El Salto',    message: 'Es el momento de atreverse. Las cartas predicen un año de ideas valientes e innovación que nos llevarán al siguiente nivel.' },
+        5: { title: 'La Cosecha',  message: 'Prepárate para un 2027 donde recogeremos grandes victorias juntos.' },
+        6: { title: 'La Estrella', message: 'La alineación es perfecta. En 2027, brillaremos tanto juntos que será imposible pasar desapercibidos.' },
+      },
+    },
+    en: {
+      pageTitle: 'The Creative Oracle · 2027',
+      title: 'The <em>Creative</em> Oracle',
+      hint: 'Tap to draw your 2027 card',
+      deckLabel: 'Deck of cards. Tap or swipe up to draw your 2027 card',
+      retry: 'Try my luck again',
+      artAlt: 'Illustration of the arcana {title}',
+      langLabel: 'Language',
+      welcome: {
+        title: 'Welcome to the <em>Creative Oracle</em>',
+        text: 'The tarot cards will tell us what the future holds.',
+        cta: 'Try my luck',
+      },
+      arcana: {
+        1: { title: 'The Alliance',   message: 'The stars are clear: the best projects are born when we join forces. 2027 will find us building together.' },
+        2: { title: 'The Impact',     message: 'A big impact on results is coming. This year, every idea we launch will leave a lasting mark.' },
+        3: { title: 'The Lighthouse', message: 'Even in the foggiest briefs, clarity will guide us. In 2027, together we will light the way to success.' },
+        4: { title: 'The Leap',       message: 'It is time to be bold. The cards foresee a year of brave ideas and innovation that will take us to the next level.' },
+        5: { title: 'The Harvest',    message: 'Get ready for a 2027 in which we will reap great victories together.' },
+        6: { title: 'The Star',       message: 'The alignment is perfect. In 2027, we will shine so brightly together that it will be impossible to go unnoticed.' },
+      },
+    },
+  };
+
   /* -----------------------------------------------------------------------
      Placeholders de ilustración (SVG generado). Sustituye `image` en ARCANA
      por la ruta real cuando tengas las ilustraciones: 'assets/arcanos/01.webp'
@@ -58,16 +120,21 @@
   };
 
   /* -----------------------------------------------------------------------
-     DATOS: los 6 Arcanos (copy provisional)
+     DATOS: los 6 Arcanos.
+     El título y el mensaje de cada carta están en TEXTS (arriba), por idioma.
+     Aquí solo queda el número y la imagen.
      ----------------------------------------------------------------------- */
   const ARCANA = [
-    { id: 1, title: 'La Alianza',  message: 'Los astros son claros: los mejores proyectos nacen cuando unimos fuerzas. El 2027 nos encontrará construyendo juntos.',   image: placeholderArt('alianza', 1) },
-    { id: 2, title: 'El Impacto',  message: 'Un gran impacto en resultados se avecina. Este año, cada idea que lancemos dejará una marca imborrable.',          image: placeholderArt('impacto', 2) },
-    { id: 3, title: 'El Faro',     message: 'Incluso en los briefings con más niebla, la claridad nos guiará. En 2027, iluminaremos juntos el camino hacia el éxito.',                image: placeholderArt('faro', 3) },
-    { id: 4, title: 'El Salto',    message: 'Es el momento de atreverse. Las cartas predicen un año de ideas valientes e innovación que nos llevarán al siguiente nivel.',     image: placeholderArt('salto', 4) },
-    { id: 5, title: 'La Cosecha',  message: 'Prepárate para un 2027 donde recogeremos grandes victorias juntos.',            image: placeholderArt('cosecha', 5) },
-    { id: 6, title: 'La Estrella', message: 'La alineación es perfecta. En 2027,  brillaremos tanto juntos que será imposible pasar desapercibidos.',            image: placeholderArt('estrella', 6) },
+    { id: 1, image: placeholderArt('alianza', 1) },
+    { id: 2, image: placeholderArt('impacto', 2) },
+    { id: 3, image: placeholderArt('faro', 3) },
+    { id: 4, image: placeholderArt('salto', 4) },
+    { id: 5, image: placeholderArt('cosecha', 5) },
+    { id: 6, image: placeholderArt('estrella', 6) },
   ];
+  /* ANTES (v1) — textos dentro de ARCANA, solo en español:
+    { id: 1, title: 'La Alianza', message: 'Los astros son claros: …', image: placeholderArt('alianza', 1) }, …
+  */
 
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
@@ -107,6 +174,16 @@
     fx: $('fx'),
     header: document.querySelector('.oracle__header'),
     retry: $('retry'),
+    retryLabel: $('retryLabel'),
+    pageTitle: $('pageTitle'),
+    hintText: $('hintText'),
+    lang: $('lang'),
+    langButtons: document.querySelectorAll('.lang__opt'),
+    welcome: $('welcome'),
+    welcomeTitle: $('welcomeTitle'),
+    welcomeText: $('welcomeText'),
+    welcomeCta: $('welcomeCta'),
+    welcomeCtaLabel: $('welcomeCtaLabel'),
   };
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -179,14 +256,83 @@
     return arcano;
   }
 
+  let currentArcano = null;
   function renderCard(a) {
+    currentArcano = a;
+    const t = TEXTS[lang];
+    const { title, message } = t.arcana[a.id];
     els.numeral.textContent = ROMAN[a.id - 1];
-    els.title.textContent = a.title;
-    els.image.src = a.image;
-    els.image.alt = `Ilustración del arcano ${a.title}`;
-    els.kicker.textContent = `${ROMAN[a.id - 1]} · ${a.title}`;
-    els.text.textContent = a.message;
+    els.title.textContent = title;
+    if (els.image.getAttribute('src') !== a.image) els.image.src = a.image;
+    els.image.alt = t.artAlt.replace('{title}', title);
+    els.kicker.textContent = `${ROMAN[a.id - 1]} · ${title}`;
+    els.text.textContent = message;
   }
+
+  /* -----------------------------------------------------------------------
+     IDIOMA: aplica TEXTS[lang] a toda la página.
+     El idioma elegido se recuerda en este navegador (localStorage).
+     ----------------------------------------------------------------------- */
+  const LANG_KEY = 'oraculo-lang';
+  let lang = TEXTS[CONFIG.defaultLang] ? CONFIG.defaultLang : 'es';
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (TEXTS[saved]) lang = saved;
+  } catch (_) { /* navegación privada: se usa el idioma por defecto */ }
+
+  function applyLanguage(next) {
+    if (TEXTS[next]) lang = next;
+    const t = TEXTS[lang];
+
+    root.lang = lang;
+    document.title = t.pageTitle;
+    els.pageTitle.innerHTML = t.title;
+    els.hintText.textContent = t.hint;
+    els.deck.setAttribute('aria-label', t.deckLabel);
+    els.retryLabel.textContent = t.retry;
+    els.lang.setAttribute('aria-label', t.langLabel);
+
+    els.welcomeTitle.innerHTML = t.welcome.title;
+    els.welcomeText.textContent = t.welcome.text;
+    els.welcomeCtaLabel.textContent = t.welcome.cta;
+
+    els.langButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+    els.lang.dataset.active = lang;
+
+    if (currentArcano) renderCard(currentArcano);   // si hay una carta sacada, se traduce al momento
+
+    try { localStorage.setItem(LANG_KEY, lang); } catch (_) {}
+  }
+
+  els.langButtons.forEach((b) => b.addEventListener('click', () => applyLanguage(b.dataset.lang)));
+
+  /* -----------------------------------------------------------------------
+     POPUP DE BIENVENIDA (se activa/desactiva con CONFIG.showWelcome)
+     Mientras está abierto, el resto de la escena queda inerte.
+     ----------------------------------------------------------------------- */
+  function openWelcome() {
+    els.welcome.hidden = false;
+    els.oracle.inert = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => els.welcome.classList.add('is-open')));
+    if (finePointer) els.welcomeCta.focus({ preventScroll: true });   // en móvil no, para que no salga el aro de foco
+  }
+
+  function closeWelcome() {
+    if (els.welcome.hidden || !els.welcome.classList.contains('is-open')) return;
+    els.welcome.classList.remove('is-open');
+    els.oracle.inert = false;
+    setTimeout(() => { els.welcome.hidden = true; }, 500 * k + 50);
+    els.deck.focus({ preventScroll: true });
+  }
+
+  els.welcomeCta.addEventListener('click', () => {
+    ensureMotionPermission();        // el toque del CTA sirve en iOS para pedir el giroscopio
+    closeWelcome();
+    if (CONFIG.welcomeCtaDraws) setTimeout(draw, 350 * k);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeWelcome();
+  });
 
   /* -----------------------------------------------------------------------
      Destellos naranjas/turquesa al girar
@@ -558,4 +704,6 @@
   });
 
   buildBackArt();
+  applyLanguage(lang);
+  if (CONFIG.showWelcome) openWelcome();
 })();
