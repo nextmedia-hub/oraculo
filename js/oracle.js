@@ -286,18 +286,19 @@
 
     root.lang = lang;
     document.title = t.pageTitle;
-    els.pageTitle.innerHTML = t.title;
-    els.hintText.textContent = t.hint;
+    // (el ?. evita errores si algún elemento no está en el HTML, p. ej. con un index.html antiguo en caché)
+    if (els.pageTitle) els.pageTitle.innerHTML = t.title;
+    if (els.hintText) els.hintText.textContent = t.hint;
     els.deck.setAttribute('aria-label', t.deckLabel);
-    els.retryLabel.textContent = t.retry;
-    els.lang.setAttribute('aria-label', t.langLabel);
+    if (els.retryLabel) els.retryLabel.textContent = t.retry;
+    els.lang?.setAttribute('aria-label', t.langLabel);
 
-    els.welcomeTitle.innerHTML = t.welcome.title;
-    els.welcomeText.textContent = t.welcome.text;
-    els.welcomeCtaLabel.textContent = t.welcome.cta;
+    if (els.welcomeTitle) els.welcomeTitle.innerHTML = t.welcome.title;
+    if (els.welcomeText) els.welcomeText.textContent = t.welcome.text;
+    if (els.welcomeCtaLabel) els.welcomeCtaLabel.textContent = t.welcome.cta;
 
     els.langButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
-    els.lang.dataset.active = lang;
+    if (els.lang) els.lang.dataset.active = lang;
 
     if (currentArcano) renderCard(currentArcano);   // si hay una carta sacada, se traduce al momento
 
@@ -311,21 +312,22 @@
      Mientras está abierto, el resto de la escena queda inerte.
      ----------------------------------------------------------------------- */
   function openWelcome() {
+    if (!els.welcome) return;          // el HTML no tiene popup: se sigue sin él
     els.welcome.hidden = false;
     els.oracle.inert = true;
     requestAnimationFrame(() => requestAnimationFrame(() => els.welcome.classList.add('is-open')));
-    if (finePointer) els.welcomeCta.focus({ preventScroll: true });   // en móvil no, para que no salga el aro de foco
+    if (finePointer) els.welcomeCta?.focus({ preventScroll: true });   // en móvil no, para que no salga el aro de foco
   }
 
   function closeWelcome() {
-    if (els.welcome.hidden || !els.welcome.classList.contains('is-open')) return;
+    if (!els.welcome || els.welcome.hidden || !els.welcome.classList.contains('is-open')) return;
     els.welcome.classList.remove('is-open');
     els.oracle.inert = false;
     setTimeout(() => { els.welcome.hidden = true; }, 500 * k + 50);
     els.deck.focus({ preventScroll: true });
   }
 
-  els.welcomeCta.addEventListener('click', () => {
+  els.welcomeCta?.addEventListener('click', () => {
     ensureMotionPermission();        // el toque del CTA sirve en iOS para pedir el giroscopio
     closeWelcome();
     if (CONFIG.welcomeCtaDraws) setTimeout(draw, 350 * k);

@@ -26,7 +26,7 @@
 
     <header class="oracle__header">
       <p class="brand"><img src="assets/logo-nextmedia.png" alt="next'media" width="720" height="117"></p>
-      <h1 class="oracle__title">El Oráculo <em>Creativo</em></h1>
+      <h1 class="oracle__title" id="pageTitle">El Oráculo <em>Creativo</em></h1>
     </header>
 
     <!-- Destellos y aura: se colocan (vía JS) detrás de la posición final de la carta -->
@@ -69,6 +69,7 @@
               </figure>
               <h2 class="card__title" id="cardTitle"></h2>
               <span class="card__glitter" aria-hidden="true"></span>
+              <span class="card__shine" aria-hidden="true"></span>
             </article>
 
           </div>
@@ -79,7 +80,7 @@
 
     <p class="hint" id="hint" aria-hidden="true">
       <svg class="hint__chevron" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
-      Toca para sacar tu carta del 2027
+      <span id="hintText">Toca para sacar tu carta del 2027</span>
     </p>
 
     <!-- ===================== REVELACIÓN ===================== -->
@@ -91,11 +92,32 @@
     <footer class="oracle__footer">
       <button class="retry" id="retry" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
-        Volver a probar suerte
+        <span id="retryLabel">Volver a probar suerte</span>
       </button>
     </footer>
 
   </main>
+
+  <!-- ===================== SELECTOR DE IDIOMA (fijo arriba a la derecha) =====================
+       Los textos de cada idioma están en js/oracle.js → TEXTS -->
+  <div class="lang" id="lang" role="group" aria-label="Idioma" data-active="es">
+    <span class="lang__thumb" aria-hidden="true"></span>
+    <button class="lang__opt" type="button" data-lang="es" aria-pressed="true">ES</button>
+    <button class="lang__opt" type="button" data-lang="en" aria-pressed="false">EN</button>
+  </div>
+
+  <!-- ===================== POPUP DE BIENVENIDA =====================
+       Se activa/desactiva en js/oracle.js → CONFIG.showWelcome (true / false) -->
+  <div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle" aria-describedby="welcomeText" hidden>
+    <div class="welcome__panel">
+      <span class="welcome__card" aria-hidden="true"><svg><use href="#back-art"/></svg></span>
+      <h2 class="welcome__title" id="welcomeTitle">Bienvenido al <em>Oráculo Creativo</em></h2>
+      <p class="welcome__text" id="welcomeText">Las cartas del tarot te dirán qué nos depara el futuro.</p>
+      <button class="retry welcome__cta" id="welcomeCta" type="button">
+        <span id="welcomeCtaLabel">Probar mi suerte</span>
+      </button>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.8.1/dist/vanilla-tilt.min.js" defer></script>
   <script src="js/oracle.js" defer></script>
